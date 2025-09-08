@@ -1,0 +1,21 @@
+{
+  "name": "dashboard-client",
+  "version": "1.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3010",
+    "build": "next build",
+    "start": "next start -p 3010"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "next": "^14.2.32",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "tailwindcss": "^3.4.7"
+  }
+}
