@@ -1,0 +1,25 @@
+﻿name: semgrep
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install semgrep
+
+      - name: Run Semgrep (community rules)
+        run: |
+          semgrep --version
+          semgrep scan --error --metrics=off --config=p/ci
