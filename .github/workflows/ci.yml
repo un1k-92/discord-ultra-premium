@@ -1,0 +1,95 @@
+﻿name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22 LTS + npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            **/package-lock.json
+
+      # .env factices pour permettre le build en CI
+      - name: Prepare CI env files (dummy)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "bot-discord" | Out-Null
+          @"
+DISCORD_TOKEN=dummy
+CLIENT_ID=111111111111111111
+GUILD_ID=000000000000000000
+"@ | Set-Content "bot-discord/.env"
+
+          New-Item -ItemType Directory -Force -Path "api-backend" | Out-Null
+          @"
+NODE_ENV=production
+PORT=3001
+JWT_SECRET=dummy
+"@ | Set-Content "api-backend/.env"
+
+          New-Item -ItemType Directory -Force -Path "dashboard-client" | Out-Null
+          @"
+NEXT_PUBLIC_API_URL=http://localhost:3001
+"@ | Set-Content "dashboard-client/.env.local"
+
+      - name: Install dependencies (workspaces)
+        run: npm ci --workspaces
+
+      - name: Lint (all workspaces)
+        run: npm run lint --workspaces --if-present
+
+      - name: Test (all workspaces)
+        run: npm test --workspaces --if-present
+
+      - name: Build (all workspaces)
+        run: npm run build --workspaces --if-present
+
+      # SBOM simple (CycloneDX) – optionnel mais recommandé
+      - name: Generate SBOM (CycloneDX)
+        shell: pwsh
+        run: |
+          npm i -g @cyclonedx/cyclonedx-npm
+          $roots = @("api-backend","bot-discord","dashboard-client")
+          foreach ($r in $roots) {
+            if (Test-Path "$r/package-lock.json") {
+              Push-Location $r
+              cyclonedx-npm --output-format JSON --output-file sbom.json
+              Pop-Location
+            }
+          }
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-windows
+          if-no-files-found: ignore
+          path: |
+            api-backend/dist/**
+            bot-discord/dist/**
+            dashboard-client/.next/**
+            **/sbom.json
